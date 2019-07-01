@@ -1,2 +1,2 @@
 # Dockerfiles-Resources
-This repository is a read-only repository dedicated to archive GPL/LGPL source code used in samples/docker images, to be compliant with the GPL/LGPL license obligations.
+This repository is a read-only repository dedicated to archive source code used in Open Visual Cloud samples/docker images, to be compliant with the open source license obligations.
