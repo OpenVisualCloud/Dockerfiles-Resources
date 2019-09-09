@@ -1,0 +1,12 @@
+diff -r gst-plugins-bad-1.16.0/ext/aom/gstav1dec.c gst-plugins-bad-1.16.0-updated/ext/aom/gstav1dec.c
+416c416
+<   GstFlowReturn ret;
+---
+>   GstFlowReturn ret = GST_FLOW_ERROR;
+diff -r gst-plugins-bad-1.16.0/gst-libs/gst/codecparsers/gsth265parser.h gst-plugins-bad-1.16.0-updated/gst-libs/gst/codecparsers/gsth265parser.h
+908,909c908,909
+<   guint32 column_width_minus1[19];
+<   guint32 row_height_minus1[21];
+---
+>   guint32 column_width_minus1[20];
+>   guint32 row_height_minus1[22];
