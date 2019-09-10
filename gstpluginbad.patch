@@ -1,0 +1,26 @@
+diff -ru gst-plugins-bad-1.16.0/ext/aom/gstav1dec.c gst-plugins-bad-1.16.0-updated/ext/aom/gstav1dec.c
+--- gst-plugins-bad-1.16.0/ext/aom/gstav1dec.c	2019-09-09 14:12:04.247668282 -0700
++++ gst-plugins-bad-1.16.0-updated/ext/aom/gstav1dec.c	2019-09-09 14:15:41.939663545 -0700
+@@ -413,7 +413,7 @@
+ gst_av1_dec_handle_frame (GstVideoDecoder * dec, GstVideoCodecFrame * frame)
+ {
+   GstAV1Dec *av1dec = GST_AV1_DEC_CAST (dec);
+-  GstFlowReturn ret;
++  GstFlowReturn ret = GST_FLOW_ERROR;
+   GstMapInfo minfo;
+   aom_codec_err_t status;
+   aom_image_t *img;
+diff -ru gst-plugins-bad-1.16.0/gst-libs/gst/codecparsers/gsth265parser.h gst-plugins-bad-1.16.0-updated/gst-libs/gst/codecparsers/gsth265parser.h
+--- gst-plugins-bad-1.16.0/gst-libs/gst/codecparsers/gsth265parser.h	2019-09-09 14:12:04.275668282 -0700
++++ gst-plugins-bad-1.16.0-updated/gst-libs/gst/codecparsers/gsth265parser.h	2019-09-09 14:13:59.787665768 -0700
+@@ -905,8 +905,8 @@
+   guint8 num_tile_columns_minus1;
+   guint8 num_tile_rows_minus1;
+   guint8 uniform_spacing_flag;
+-  guint32 column_width_minus1[19];
+-  guint32 row_height_minus1[21];
++  guint32 column_width_minus1[20];
++  guint32 row_height_minus1[22];
+   guint8 loop_filter_across_tiles_enabled_flag;
+ 
+   guint8 loop_filter_across_slices_enabled_flag;
