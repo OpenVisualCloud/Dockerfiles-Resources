@@ -1,0 +1,27 @@
+From bf8750426bf84d972264fb430bf8f56f0b7eca43 Mon Sep 17 00:00:00 2001
+From: Chirag Lathia <clathia@google.com>
+Date: Thu, 15 Nov 2018 10:51:32 -0800
+Subject: [PATCH] Add a maximum constraint of 16 encoder threads.
+
+Signed-off-by: Chirag Lathia <clathia@google.com>
+---
+ libavcodec/libvpxenc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/libavcodec/libvpxenc.c b/libavcodec/libvpxenc.c
+index ad440a9c21..da9b9c6d46 100644
+--- a/libavcodec/libvpxenc.c
++++ b/libavcodec/libvpxenc.c
+@@ -497,7 +497,8 @@ static av_cold int vpx_init(AVCodecContext *avctx,
+     enccfg.g_h            = avctx->height;
+     enccfg.g_timebase.num = avctx->time_base.num;
+     enccfg.g_timebase.den = avctx->time_base.den;
+-    enccfg.g_threads      = avctx->thread_count ? avctx->thread_count : av_cpu_count();
++    enccfg.g_threads      =
++        FFMIN(avctx->thread_count ? avctx->thread_count : av_cpu_count(), 16);
+     enccfg.g_lag_in_frames= ctx->lag_in_frames;
+ 
+     if (avctx->flags & AV_CODEC_FLAG_PASS1)
+-- 
+2.19.1.1215.g8438c0b245-goog
+
