@@ -8,6 +8,7 @@ cb8557037a46d9a580ba749033643741  dav1d-0.5.2.tar.gz
 2a3f2934b1d31ff250bf04d5af878b87  dldt-2019_R1.1.tar.gz
 9628e3cbd3e2f23213e858c4bd233666  dldt-2019_R3.tar.gz
 91a484b4eb123d0475a64ac93afa8b4b  dldt-2020.1.tar.gz
+db1ac33501c2b3670d829109a1b88555  dldt-2020.2.tar.gz
 9581252e43aa57cd700e3a29fc45ae83  dldt-c_api_v1-0.1.tar.gz
 1787658c2e5b9cf3a927b35725ef0849  dldt-c_api_v2.0.0.tar.gz
 9b69a4440f583fefb6ac89c29f413193  dldt-c_api_v2.0.1.tar.gz
@@ -17,6 +18,7 @@ c9212982c5d3d91f352e1db3660d8c7a  fdk-aac-0.1.6.src.tgz
 2664c4d1a7e3a60cab2bc10d9b6e5f69  ffmpeg-ma-v0.3.tar.gz
 e1cfd0b5b4bc42849c9e4e4306218bcf  ffmpeg-ma-v0.4.1.tar.gz
 6b78d1c2c3b8cfffffd40e9ba28b933f  ffmpeg-ma-v0.4.tar.gz
+dc5b52871e58183a4ef8febe75cf500f  ffmpeg-ma-v0.5.tar.gz
 1273ca1fc6d448a7e22ca7020f5fb273  FFmpeg-n4.1.src.gz
 199e664666c6cde776f51a4312521489  FFmpeg-n4.2.tar.gz
 55ecb2be38da5764b82090b454df1c7f  ffmpeg_patches_release-0.1.tar.gz
@@ -33,6 +35,7 @@ d1a7b442994d9522418de4af4330e034  gst-plugins-good-1.16.0.tar.xz
 8c3f9ee3e47cbdb75a94f7183460b721  gstreamer-vaapi-1.16.0.tar.xz
 737165dc84845352dbe2620432423147  gst-video-analytics-v0.6.1.tar.gz
 cb13103887fae0674fbbfe114e6bd8fc  gst-video-analytics-v0.7.0.tar.gz
+ef1b4e6c9c3d11453e10214355f49405  gst-video-analytics-v1.0.0.tar.gz
 25d5570d959a18a02e7271675af3830a  intel-gmmlib-18.3.0.src.tgz
 d9700a376d879196b862f4e50ffba92c  intel-media-driver-kbl-19.1.0.src.tgz
 20dba7bf773599a0842745a2fe5b7cd3  json-c-0.13.1-20180305.tar.gz
@@ -48,9 +51,10 @@ b381bebbc24d4bcfb10f223bb27b9983  libnice014-removecandidate.patch
 5d6ddee146f5af007fd17ff44bdd1eee  libva_utils-2.4.0.tar.gz
 edff82f3263401c38bf6aa4cc8cba656  libvorbis-1.3.6.src.tgz
 ae6058f5c2920475fb3ae9ee53e5859c  llvm-patches-96d382b.tar.gz
-26d6fbe0fec7d203fe3c8fc328e7fa84  MD5SUMS
+1bc14a4e6382026040dd20d3ab25e65a  MD5SUMS
 d3d2ca277b384552f3e9b1ea407cf62e  MediaSDK-MSS-KBL-2019-R1.src.tgz
 239b829a13cea1d244c1044e830bd9c2  nginx-1.14.2.tar.gz
+45a80f75336c980d240987badc3dcf60  nginx-1.16.1.tar.gz
 e570f9f72e4d267b23761ab23df81d0a  nginx_http_flv-04dc8369b260c8c851f12fc30ea2f9df03f73c4e.tar.gz
 55ecb2be38da5764b82090b454df1c7f  nginx_http_flv_patches_release-0.1
 edfcd565ae2caa4032b8e442862f437c  nginx_http_flv-v1.2.7.tar.gz
@@ -69,12 +73,15 @@ c0ae256b0415a12c8566839f2d883932  SCVP_v1.0.0.tar.gz
 7d15cffe0e67a7f95f5b0f7520e428b5  SVT-AV1-0.5.0.src.tgz
 8a6df2bb41f9752f549107e397723316  SVT-AV1-0.6.0.src.tgz
 22a2f49216520d79641dbe6158846662  svt-av1-patches-release-0.3.tar.gz
+20c82838804513c07ecaf672edb36965  svt-av1-patches-v0.4.tar.gz
 fbd385a6b65ba81350b5962853bb82a9  SVT-AV1-v0.8.0.tar.gz
 7cbe267942102d5242f3941908038366  SVT-AV1-v0.8.1.tar.gz
+16ff0591aa7c5c186450748193bd4d45  SVT-AV1-v0.8.3.tar.gz
 84538b9db445cab65fcb56e4a74fb51b  SVT-HEVC-20a47b0d904e9d99e089d93d7c33af92788cbfdb.src.tgz
 66da911e5d975950f1fc96bb3c7d201c  SVT-HEVC-v1.4.3.tar.gz
 8808c8315e9dcde504f857faef99b5b8  SVT-VP9-d18b4acf9139be2e83150e318ffd3dba1c432e74.src.tgz
 149ba1f58dadc8190bba5fa1bb726b06  SVT-VP9-v0.1.0.tar.gz
+cb74939cdbfaaf74b521caa8f6c64b7c  SVT-VP9-v0.2.0.tar.gz
 f6471dc9db635fab7754d180a166ca47  vpx-1.7.0.src.tgz
 cc3a3a8b9da2fe0fd130516015fd92dc  x264-stable.src.tgz
 d3cb0661addbe931452555bbe0d63262  x265-2.9.src.tgz
