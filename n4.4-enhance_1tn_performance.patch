@@ -1,0 +1,360 @@
+diff --git a/fftools/ffmpeg.c b/fftools/ffmpeg.c
+index 46bb014..f8cfeea 100644
+--- a/fftools/ffmpeg.c
++++ b/fftools/ffmpeg.c
+@@ -1582,6 +1582,105 @@ static int reap_filters(int flush)
+     return 0;
+ }
+ 
++/**
++ * Base on reap_filters() in threads.
++ *
++ * @return  0 for success, <0 for severe errors
++ */
++static int pipeline_reap_filters(int flush, InputFilter * ifilter)
++{
++    AVFrame *filtered_frame = NULL;
++    OutputStream *ost;
++    OutputFile *of;
++    AVFilterContext *filter;
++    AVCodecContext *enc;
++    int ret = 0;
++    int i;
++
++    for (i = 0; i < nb_output_streams; i++) {
++        if (ifilter == output_streams[i]->filter->graph->inputs[0]) {
++            break;
++        }
++    }
++
++    if(i >= nb_output_streams) {
++        av_log(NULL, AV_LOG_ERROR, "Not found Input filter\n");
++        exit_program(1);
++    }
++    ost = output_streams[i];
++    of = output_files[ost->file_index];
++    enc = ost->enc_ctx;
++
++
++    if (!ost->filter || !ost->filter->graph->graph)
++        return 0;
++    filter = ost->filter->filter;
++
++    /*
++     * Unlike video, with audio the audio frame size matters.
++     * Currently we are fully reliant on the lavfi filter chain to
++     * do the buffering deed for us, and thus the frame size parameter
++     * needs to be set accordingly. Where does one get the required
++     * frame size? From the initialized AVCodecContext of an audio
++     * encoder. Thus, if we have gotten to an audio stream, initialize
++     * the encoder earlier than receiving the first AVFrame.
++     */
++    if (av_buffersink_get_type(filter) == AVMEDIA_TYPE_AUDIO)
++        init_output_stream_wrapper(ost, NULL, 1);
++
++    if (!ost->pkt && !(ost->pkt = av_packet_alloc())) {
++        return AVERROR(ENOMEM);
++    }
++    if (!ost->filtered_frame && !(ost->filtered_frame = av_frame_alloc())) {
++        return AVERROR(ENOMEM);
++    }
++    filtered_frame = ost->filtered_frame;
++
++    while (1) {
++        ret = av_buffersink_get_frame_flags(filter, filtered_frame,
++                                           AV_BUFFERSINK_FLAG_NO_REQUEST);
++        if (ret < 0) {
++            if (ret != AVERROR(EAGAIN) && ret != AVERROR_EOF) {
++                av_log(NULL, AV_LOG_WARNING,
++                       "Error in av_buffersink_get_frame_flags(): %s\n", av_err2str(ret));
++            } else if (flush && ret == AVERROR_EOF) {
++                if (av_buffersink_get_type(filter) == AVMEDIA_TYPE_VIDEO)
++                    do_video_out(of, ost, NULL);
++            }
++            break;
++        }
++        if (ost->finished) {
++            av_frame_unref(filtered_frame);
++            continue;
++        }
++
++        switch (av_buffersink_get_type(filter)) {
++        case AVMEDIA_TYPE_VIDEO:
++            if (!ost->frame_aspect_ratio.num)
++                enc->sample_aspect_ratio = filtered_frame->sample_aspect_ratio;
++
++            do_video_out(of, ost, filtered_frame);
++            break;
++        case AVMEDIA_TYPE_AUDIO:
++            if (!(enc->codec->capabilities & AV_CODEC_CAP_PARAM_CHANGE) &&
++                enc->channels != filtered_frame->channels) {
++                av_log(NULL, AV_LOG_ERROR,
++                       "Audio filter graph output is not normalized and encoder does not support parameter changes\n");
++                break;
++            }
++            do_audio_out(of, ost, filtered_frame);
++            break;
++        default:
++            // TODO support subtitle filters
++            av_assert0(0);
++        }
++
++        av_frame_unref(filtered_frame);
++    }
++
++    return 0;
++}
++
+ static void print_final_stats(int64_t total_size)
+ {
+     uint64_t video_size = 0, audio_size = 0, extra_size = 0, other_size = 0;
+@@ -2225,7 +2324,15 @@ static int ifilter_send_frame(InputFilter *ifilter, AVFrame *frame)
+             }
+         }
+ 
++#if HAVE_THREADS
++        if (!abr_pipeline) {
++            ret = reap_filters(1);
++        } else {
++            ret = pipeline_reap_filters(1, ifilter);
++        }
++#else
+         ret = reap_filters(1);
++#endif
+         if (ret < 0 && ret != AVERROR_EOF) {
+             av_log(NULL, AV_LOG_ERROR, "Error while filtering: %s\n", av_err2str(ret));
+             return ret;
+@@ -2254,6 +2361,16 @@ static int ifilter_send_eof(InputFilter *ifilter, int64_t pts)
+ 
+     ifilter->eof = 1;
+ 
++#if HAVE_THREADS
++    if (abr_pipeline) {
++        ifilter->waited_frm = NULL;
++        pthread_mutex_lock(&ifilter->process_mutex);
++        ifilter->t_end = 1;
++        pthread_cond_signal(&ifilter->process_cond);
++        pthread_mutex_unlock(&ifilter->process_mutex);
++        pthread_join(ifilter->f_thread, NULL);
++    }
++#endif
+     if (ifilter->filter) {
+         ret = av_buffersrc_close(ifilter->filter, pts, AV_BUFFERSRC_FLAG_PUSH);
+         if (ret < 0)
+@@ -2298,6 +2415,41 @@ static int decode(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacke
+     return 0;
+ }
+ 
++#if HAVE_THREADS
++static void *filter_pipeline(void *arg)
++{
++    InputFilter *fl = arg;
++    AVFrame *frm;
++    int ret;
++    while(1) {
++        pthread_mutex_lock(&fl->process_mutex);
++        while (fl->waited_frm == NULL && !fl->t_end)
++            pthread_cond_wait(&fl->process_cond, &fl->process_mutex);
++        pthread_mutex_unlock(&fl->process_mutex);
++
++        if (fl->t_end) break;
++
++        frm = fl->waited_frm;
++        ret = ifilter_send_frame(fl, frm);
++        if (ret < 0) {
++            av_log(NULL, AV_LOG_ERROR,
++                   "Failed to inject frame into filter network: %s\n", av_err2str(ret));
++        } else
++            ret = pipeline_reap_filters(0, fl);
++
++        fl->t_error = ret;
++
++        pthread_mutex_lock(&fl->finish_mutex);
++        fl->waited_frm = NULL;
++        pthread_cond_signal(&fl->finish_cond);
++        pthread_mutex_unlock(&fl->finish_mutex);
++
++        if (ret < 0)
++            break;
++    }
++    return NULL;
++}
++#endif
+ static int send_frame_to_filters(InputStream *ist, AVFrame *decoded_frame)
+ {
+     int i, ret;
+@@ -2305,22 +2457,73 @@ static int send_frame_to_filters(InputStream *ist, AVFrame *decoded_frame)
+ 
+     av_assert1(ist->nb_filters > 0); /* ensure ret is initialized */
+     for (i = 0; i < ist->nb_filters; i++) {
+-        if (i < ist->nb_filters - 1) {
+-            f = ist->filter_frame;
+-            ret = av_frame_ref(f, decoded_frame);
+-            if (ret < 0)
++#if HAVE_THREADS
++        if (!abr_pipeline) {
++#endif
++            if (i < ist->nb_filters - 1) {
++                f = ist->filter_frame;
++                ret = av_frame_ref(f, decoded_frame);
++                if (ret < 0)
++                    break;
++            } else
++                f = decoded_frame;
++
++                ret = ifilter_send_frame(ist->filters[i], f);
++                if (ret == AVERROR_EOF)
++                    ret = 0; /* ignore */
++                if (ret < 0) {
++                    av_log(NULL, AV_LOG_ERROR,
++                           "Failed to inject frame into filter network: %s\n", av_err2str(ret));
++                    break;
++                }
++#if HAVE_THREADS
++        } else {
++            if (i < ist->nb_filters - 1) {
++                f = &ist->filters[i]->input_frm;
++                ret = av_frame_ref(f, decoded_frame);
++                if (ret < 0)
++                    break;
++            } else
++                f = decoded_frame;
++
++            if(ist->filters[i]->f_thread == 0) {
++                pthread_mutex_init(&ist->filters[i]->process_mutex, NULL);
++                pthread_mutex_init(&ist->filters[i]->finish_mutex, NULL);
++                pthread_cond_init(&ist->filters[i]->process_cond, NULL);
++                pthread_cond_init(&ist->filters[i]->finish_cond, NULL);
++                ist->filters[i]->t_end = 0;
++                ist->filters[i]->t_error = 0;
++
++                if ((ret = pthread_create(&ist->filters[i]->f_thread, NULL, filter_pipeline, ist->filters[i]))) {
++                    av_log(NULL, AV_LOG_ERROR, "pthread_create failed: %s. Try to increase `ulimit -v` or decrease `ulimit -s`.\n", strerror(ret));
++                    return AVERROR(ret);
++                }
++            }
++
++            pthread_mutex_lock(&ist->filters[i]->process_mutex);
++            ist->filters[i]->waited_frm = f;
++            pthread_cond_signal(&ist->filters[i]->process_cond);
++            pthread_mutex_unlock(&ist->filters[i]->process_mutex);
++        }
++#endif
++    }
++#if HAVE_THREADS
++    if (abr_pipeline) {
++        for (i = 0; i < ist->nb_filters; i++) {
++            pthread_mutex_lock(&ist->filters[i]->finish_mutex);
++            while(ist->filters[i]->waited_frm != NULL)
++                pthread_cond_wait(&ist->filters[i]->finish_cond, &ist->filters[i]->finish_mutex);
++            pthread_mutex_unlock(&ist->filters[i]->finish_mutex);
++        }
++        for (i = 0; i < ist->nb_filters; i++) {
++            if (ist->filters[i]->t_error < 0) {
++                ret = ist->filters[i]->t_error;
+                 break;
+-        } else
+-            f = decoded_frame;
+-        ret = ifilter_send_frame(ist->filters[i], f);
+-        if (ret == AVERROR_EOF)
+-            ret = 0; /* ignore */
+-        if (ret < 0) {
+-            av_log(NULL, AV_LOG_ERROR,
+-                   "Failed to inject frame into filter network: %s\n", av_err2str(ret));
+-            break;
++            }
+         }
+     }
++#endif
++
+     return ret;
+ }
+ 
+@@ -4753,6 +4956,9 @@ static int transcode_step(void)
+     if (ret < 0)
+         return ret == AVERROR_EOF ? 0 : ret;
+ 
++#if HAVE_THREADS
++    if (abr_pipeline) return 0;
++#endif
+     return reap_filters(0);
+ }
+ 
+diff --git a/fftools/ffmpeg.h b/fftools/ffmpeg.h
+index 3a4ddf4..4942702 100644
+--- a/fftools/ffmpeg.h
++++ b/fftools/ffmpeg.h
+@@ -258,6 +258,17 @@ typedef struct InputFilter {
+ 
+     AVBufferRef *hw_frames_ctx;
+ 
++    // for abr pipeline
++    AVFrame *waited_frm;
++    AVFrame input_frm;
++    pthread_t f_thread;
++    pthread_cond_t process_cond;
++    pthread_cond_t finish_cond;
++    pthread_mutex_t process_mutex;
++    pthread_mutex_t finish_mutex;
++    int t_end;
++    int t_error;
++
+     int eof;
+ } InputFilter;
+ 
+@@ -628,6 +639,7 @@ extern int frame_bits_per_raw_sample;
+ extern AVIOContext *progress_avio;
+ extern float max_error_rate;
+ extern char *videotoolbox_pixfmt;
++extern int abr_pipeline;
+ 
+ extern int filter_nbthreads;
+ extern int filter_complex_nbthreads;
+diff --git a/fftools/ffmpeg_filter.c b/fftools/ffmpeg_filter.c
+index 8c8a9df..39678cd 100644
+--- a/fftools/ffmpeg_filter.c
++++ b/fftools/ffmpeg_filter.c
+@@ -176,6 +176,7 @@ DEF_CHOOSE_FORMAT(channel_layouts, uint64_t, channel_layout, channel_layouts, 0,
+ int init_simple_filtergraph(InputStream *ist, OutputStream *ost)
+ {
+     FilterGraph *fg = av_mallocz(sizeof(*fg));
++    int i;
+ 
+     if (!fg)
+         exit_program(1);
+@@ -204,6 +205,11 @@ int init_simple_filtergraph(InputStream *ist, OutputStream *ost)
+     GROW_ARRAY(ist->filters, ist->nb_filters);
+     ist->filters[ist->nb_filters - 1] = fg->inputs[0];
+ 
++    if (abr_pipeline) {
++        for (i = 0; i < ist->nb_filters; i++) {
++            ist->filters[i]->f_thread = 0;
++        }
++    }
+     GROW_ARRAY(filtergraphs, nb_filtergraphs);
+     filtergraphs[nb_filtergraphs - 1] = fg;
+ 
+diff --git a/fftools/ffmpeg_opt.c b/fftools/ffmpeg_opt.c
+index 6dccd15..7e12c03 100644
+--- a/fftools/ffmpeg_opt.c
++++ b/fftools/ffmpeg_opt.c
+@@ -179,6 +179,7 @@ int filter_scale_nbthreads      = 0;
+ int vstats_version = 2;
+ int auto_conversion_filters = 1;
+ int64_t stats_period = 500000;
++int abr_pipeline      = 0;
+ 
+ 
+ static int intra_only         = 0;
+@@ -3616,7 +3617,10 @@ const OptionDef options[] = {
+         "set the maximum number of queued packets from the demuxer" },
+     { "find_stream_info", OPT_BOOL | OPT_PERFILE | OPT_INPUT | OPT_EXPERT, { &find_stream_info },
+         "read and decode the streams to fill missing information with heuristics" },
+-
++#if HAVE_THREADS
++    { "abr_pipeline",    OPT_BOOL,                                    { &abr_pipeline },
++        "adaptive bitrate pipeline (1 decode to N filter graphs, and 1 to N transcode" },
++#endif
+     /* video options */
+     { "vframes",      OPT_VIDEO | HAS_ARG  | OPT_PERFILE | OPT_OUTPUT,           { .func_arg = opt_video_frames },
+         "set the number of video frames to output", "number" },
