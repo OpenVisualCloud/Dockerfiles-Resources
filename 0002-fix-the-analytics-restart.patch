@@ -1,0 +1,41 @@
+From 94a283860a583aa4f71a92829dadbd244b4bcb6d Mon Sep 17 00:00:00 2001
+From: Pengfei Qu <Pengfei.Qu@intel.com>
+Date: Tue, 6 Jul 2021 10:32:16 -0400
+Subject: [PATCH 2/2] fix the analytics restart
+
+---
+ source/agent/conference/conference.js | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/source/agent/conference/conference.js b/source/agent/conference/conference.js
+index d1a2fa9..898f7e4 100644
+--- a/source/agent/conference/conference.js
++++ b/source/agent/conference/conference.js
+@@ -2333,8 +2333,24 @@ var Conference = function (rpcClient, selfRpcId) {
+   that.addServerSideSubscription = function(roomId, subDesc, callback) {
+     log.debug('addServerSideSubscription, roomId:', roomId, 'subDesc:', JSON.stringify(subDesc));
+ 
++    if (subDesc.type === 'analytics') {
++        var analyticsstreamid = subDesc.connection.algorithm + subDesc.media.video.from;
++        if (streams[analyticsstreamid]) {
++            return Promise.reject('Stream has been analyzed with the same algorithm');
++        }
++    }
++
+     if (subDesc.type === 'streaming' || subDesc.type === 'recording' || subDesc.type === 'analytics') {
+       var subscription_id = Math.round(Math.random() * 1000000000000000000) + '';
++      if (subDesc.type === 'analytics') {
++          subscription_id = subDesc.connection.algorithm + subDesc.media.video.from;
++          if (subscriptions[subscription_id] ) {
++              return Promise.reject('Stream has been analyzed with the same algorithm');
++          }
++      } else {
++          subscription_id = Math.round(Math.random() * 1000000000000000000) + '';
++      }
++
+       var origin = {isp: 'isp', region: 'region'};
+       return initRoom(roomId, origin)
+       .then(() => {
+-- 
+1.8.3.1
+
