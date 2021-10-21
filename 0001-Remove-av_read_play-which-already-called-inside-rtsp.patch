@@ -1,0 +1,45 @@
+From c50db25ea22ad1de9269f2a79da49841a8518809 Mon Sep 17 00:00:00 2001
+From: DiffenYu <ydfyudingfeng@gmail.com>
+Date: Sun, 26 Sep 2021 10:09:27 +0800
+Subject: [PATCH] Remove av_read_play which already called inside rtsp (#1093)
+
+Some rtsp server will handle the second PLAY request
+as error and disconnect the TCP connection, it will
+cause the stream disconnect and trigger the reconnect
+mechnism in LiveStream, continue to disconnect and
+reconnect.
+
+Signed-off-by: Yu, Dingfeng <dingfeng.yu@intel.com>
+---
+ source/core/owt_base/LiveStreamIn.cpp | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/source/core/owt_base/LiveStreamIn.cpp b/source/core/owt_base/LiveStreamIn.cpp
+index 61233aff..3b1f182d 100644
+--- a/source/core/owt_base/LiveStreamIn.cpp
++++ b/source/core/owt_base/LiveStreamIn.cpp
+@@ -741,7 +741,9 @@ bool LiveStreamIn::connect()
+ 
+     m_AsyncEvent << "}";
+ 
+-    av_read_play(m_context);
++    if (m_context->iformat->read_play == nullptr) {
++        av_read_play(m_context);
++    }
+ 
+     if (m_videoJitterBuffer) {
+         m_videoJitterBuffer->start();
+@@ -851,7 +853,9 @@ bool LiveStreamIn::reconnect()
+     if (m_isFileInput)
+         m_timstampOffset = m_lastTimstamp + 1;
+ 
+-    av_read_play(m_context);
++    if (m_context->iformat->read_play == nullptr) {
++        av_read_play(m_context);
++    }
+ 
+     if (m_videoJitterBuffer)
+         m_videoJitterBuffer->start();
+-- 
+2.17.1
+
